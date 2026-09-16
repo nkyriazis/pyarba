@@ -62,6 +62,42 @@ jobs:
             /tmp/clean/bin/python -c "import $m"
           done
 
+  pip:
+    name: pip install, then run from outside the source tree
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: System prerequisites (the README's apt line)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake \
+            libeigen3-dev libceres-dev libsuitesparse-dev libtbb-dev \
+            libboost-log-dev libboost-system-dev libboost-filesystem-dev \
+            libboost-test-dev \
+            python3-dev python3-pip python3-venv
+
+      # A virtualenv with nothing in it, so the install has to bring its own
+      # dependencies and the extension has to arrive in the wheel.
+      - name: pip install .
+        run: |
+          python3 -m venv /tmp/wheelenv
+          /tmp/wheelenv/bin/pip install --upgrade pip
+          /tmp/wheelenv/bin/pip install .
+          /tmp/wheelenv/bin/pip show -f pyarba
+
+      - name: The sift extra resolves
+        run: /tmp/wheelenv/bin/pip install --dry-run '.[sift]'
+
+      # Outside the checkout: nothing can be picked up from the working
+      # directory, so this only passes if the wheel really carries both.
+      - name: Import and run from outside the source tree
+        run: |
+          mkdir -p /tmp/elsewhere && cd /tmp/elsewhere
+          /tmp/wheelenv/bin/python -c "import arba, pyARBA; print(pyARBA.__file__)"
+          /tmp/wheelenv/bin/python -m arba.quickstart
+
   docker:
     name: docker image
     runs-on: ubuntu-24.04
