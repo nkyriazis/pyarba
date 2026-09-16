@@ -1,0 +1,20 @@
+# What the library needs to run. Deliberately unpinned: nothing here is
+# version-sensitive except pybind11, and the constraint there is a floor,
+# not a pin -- pybind11 < 2.12 segfaults converting a NumPy >= 2 array,
+# which is the first thing every pyARBA entry point does.
+#
+# pybind11 is a build dependency; numpy, scipy and tqdm are the whole of
+# the runtime. Importing any module under arba/ needs nothing else, and CI
+# proves that on every push.
+pybind11>=2.12
+numpy
+scipy
+tqdm
+
+# Optional, and only for refine_core.extract_and_match, which shells the
+# SIFT front end out to pycolmap. Everything downstream of it -- reading a
+# COLMAP database, building the problem, solving it, scoring the result --
+# works without pycolmap installed, so it is deliberately not a hard
+# requirement:
+#
+#   pip install pycolmap
