@@ -24,6 +24,12 @@ function(arba_missing NAME WHAT)
       "See the Prerequisites section of the README for other platforms.")
 endfunction()
 
+# scikit-build-core points CMake at the interpreter it is building for; plain
+# CMake builds find one themselves. Both end up in Python3_EXECUTABLE.
+if(SKBUILD AND DEFINED Python_EXECUTABLE AND NOT DEFINED Python3_EXECUTABLE)
+  set(Python3_EXECUTABLE "${Python_EXECUTABLE}")
+endif()
+
 find_package(Python3 COMPONENTS Interpreter Development)
 
 # Prefer a pip-installed pybind11 over a distribution one: pybind11 < 2.12
@@ -121,7 +127,16 @@ add_executable(tests tests.cpp)
 target_link_libraries(tests PRIVATE bundle_adjuster Ceres::ceres
                                     ${Boost_LIBRARIES})
 
-# to install we need to figure out the python site packages directory
+if(SKBUILD)
+  # Building a wheel: scikit-build-core stages the install tree and then
+  # packs it, so the destination is the wheel root, where pyARBA lands
+  # alongside the arba package. An absolute site-packages path would escape
+  # the staging directory and produce an empty wheel.
+  install(TARGETS pyARBA DESTINATION .)
+  return()
+endif()
+
+# A plain `cmake --install` instead: drop the module into site-packages.
 execute_process(
   COMMAND ${Python3_EXECUTABLE} -c
           "import site; print(site.getsitepackages()[0])"

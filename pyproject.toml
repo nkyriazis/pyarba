@@ -1,0 +1,63 @@
+# pip install . builds the C++ solver and puts the pyARBA extension module in
+# the wheel next to the arba package. The build backend is scikit-build-core,
+# which drives the existing CMake project in arcore_bundle_adjuster/ rather
+# than duplicating it.
+#
+# Packaging is an addition, not a replacement: the Docker image and the
+# PYTHONPATH layout described in the README both still work untouched.
+#
+# The system libraries this needs -- Ceres >= 2.2, Eigen, TBB, Boost,
+# SuiteSparse -- cannot come from pip and must already be installed. See
+# Prerequisites in the README; CMake will name them if they are missing.
+
+[build-system]
+requires = ["scikit-build-core>=0.10", "pybind11>=2.12"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "pyarba"
+version = "0.1.0"
+description = "Triangulation-free bundle adjustment with graduated non-convexity for camera pose refinement from coarse priors"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Nikolaos Kyriazis", email = "nkyriazis@gmail.com" }]
+license = { text = "Apache-2.0" }
+keywords = [
+  "bundle-adjustment",
+  "camera-pose-refinement",
+  "structure-from-motion",
+  "graduated-non-convexity",
+  "arcore",
+  "arkit",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: C++",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Image Processing",
+]
+
+# The whole runtime. Every module under arba/ imports on these three alone,
+# and CI proves it in a clean virtualenv on every push.
+dependencies = ["numpy", "scipy", "tqdm"]
+
+[project.optional-dependencies]
+# refine_core.extract_and_match imports pycolmap inside the function, because
+# the SIFT front end is the only thing that needs it. If you already have a
+# COLMAP database -- from any source -- you never do.
+sift = ["pycolmap"]
+
+[project.urls]
+Homepage = "https://github.com/nkyriazis/pyarba"
+Repository = "https://github.com/nkyriazis/pyarba"
+Paper = "https://arxiv.org/abs/2608.21008"
+
+[tool.scikit-build]
+# The CMake project lives one level down; the Python package is at the root.
+cmake.source-dir = "arcore_bundle_adjuster"
+cmake.version = ">=3.22"
+cmake.build-type = "Release"
+wheel.packages = ["arba"]
+sdist.include = ["cmake", "arcore_bundle_adjuster", "arba"]

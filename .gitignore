@@ -7,3 +7,8 @@ build/
 
 *.db
 *.log
+
+# packaging output
+dist/
+*.egg-info/
+_skbuild/
