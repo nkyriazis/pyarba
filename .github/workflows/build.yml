@@ -1,0 +1,75 @@
+name: build
+
+# Builds the C++ ray-time bundle adjuster, runs its Boost.Test suite, and
+# runs the toy quickstart end to end. The point is that the build and run
+# instructions in the README stay true: if this job goes red, the README is
+# lying.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  native:
+    name: ubuntu-24.04 (apt dependencies)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake \
+            libeigen3-dev libceres-dev libsuitesparse-dev libtbb-dev \
+            libboost-log-dev libboost-system-dev libboost-filesystem-dev \
+            libboost-test-dev \
+            python3-dev python3-pip
+          pip install --break-system-packages -r requirements-run.txt
+
+      - name: Configure
+        run: |
+          cmake -S arcore_bundle_adjuster -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build -j "$(nproc)"
+
+      - name: Unit tests
+        run: ./build/tests --log_level=test_suite
+
+      - name: Quickstart (toy scene with a known answer)
+        run: PYTHONPATH="$PWD:$PWD/build" python3 -m arba.quickstart
+
+  imports:
+    name: runtime dependencies are numpy, scipy, tqdm
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # A clean virtualenv with nothing but the three runtime packages, so
+      # that an import of anything under arba/ that reaches for cv2,
+      # trimesh, sklearn, matplotlib, pycolmap or networkx fails here
+      # rather than in a user's environment.
+      - name: Import every module on numpy + scipy + tqdm alone
+        run: |
+          python3 -m venv /tmp/clean
+          /tmp/clean/bin/pip install --quiet numpy scipy tqdm
+          /tmp/clean/bin/pip list
+          for m in $(cd . && ls arba/*.py | sed 's#/#.#;s#\.py$##'); do
+            echo "importing $m"
+            /tmp/clean/bin/python -c "import $m"
+          done
+
+  docker:
+    name: docker image
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t pyarba .
+      - name: Unit tests
+        run: docker run --rm pyarba ./build/tests
+      - name: Quickstart
+        run: docker run --rm pyarba python3 -m arba.quickstart
